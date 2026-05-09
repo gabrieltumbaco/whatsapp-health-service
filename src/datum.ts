@@ -1,5 +1,5 @@
 const BASE_URL = process.env.DATUM_BASE_URL!;
-const API_KEY = process.env.DATUMV2_API_KEY!;
+const API_KEY = process.env.DATUM_API_KEY!;
 
 export const COLLECTIONS = {
   BOTS: 'pbc_1454544717',

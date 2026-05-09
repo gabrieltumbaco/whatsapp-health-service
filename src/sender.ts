@@ -1,5 +1,5 @@
 import type { WASocket } from '@whiskeysockets/baileys';
-import type { Bot } from './types.js';
+import type { Bot, SendRecord } from './types.js';
 import { getRandomMessage } from './messages.js';
 
 function sleep(ms: number): Promise<void> {
@@ -21,10 +21,10 @@ function shuffle<T>(arr: T[]): T[] {
 
 export async function sendToAll(
   sock: WASocket,
-  bots: Bot[]
-): Promise<Map<string, number>> {
+  bots: Bot[],
+  sendRecords: Map<string, SendRecord>
+): Promise<void> {
   const shuffled = shuffle(bots);
-  const sendTimestamps = new Map<string, number>();
 
   console.log(`[SEND] Sending to ${shuffled.length} bots`);
 
@@ -37,13 +37,12 @@ export async function sendToAll(
 
     try {
       await sock.sendMessage(jid, { text: msg });
-      sendTimestamps.set(bot.phoneNumber, Date.now());
+      sendRecords.set(jid, { bot, sentAt: Date.now(), phone: bot.phoneNumber });
       console.log(`[SEND] ${bot.botName} (+${(delay / 1000).toFixed(1)}s)`);
     } catch (err) {
       console.log(`[SEND] ERROR ${bot.botName}: ${(err as Error).message}`);
     }
   }
 
-  console.log(`[SEND] Done. ${sendTimestamps.size}/${bots.length} sent`);
-  return sendTimestamps;
+  console.log(`[SEND] Done. ${sendRecords.size} records for ${bots.length} bots`);
 }

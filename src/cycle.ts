@@ -5,7 +5,7 @@ import { sendToAll } from './sender.js';
 import { waitForResponses } from './receiver.js';
 import { notifySlack } from './slack.js';
 import { saveMetrics } from './metrics.js';
-import type { BotResult, CycleResult } from './types.js';
+import type { BotResult, CycleResult, SendRecord } from './types.js';
 
 function buildCycleResult(results: BotResult[], startedAt: string): CycleResult {
   const ok = results.filter((r) => r.status === 'OK');
@@ -48,8 +48,15 @@ export async function runCycle(sock: WASocket): Promise<void> {
 
     console.log(`[CYCLE] ${bots.length} active bots, thresholds: OK<=${config.threshold_ok_seconds}s SLOW<=${config.threshold_slow_seconds}s`);
 
-    const sendTimestamps = await sendToAll(sock, bots);
-    const results = await waitForResponses(sock, bots, sendTimestamps, config);
+    const sendRecords = new Map<string, SendRecord>();
+    let notifySendDone!: () => void;
+    const sendingDone = new Promise<void>((r) => { notifySendDone = r; });
+
+    const responsePromise = waitForResponses(sock, bots, sendRecords, config, sendingDone);
+    await sendToAll(sock, bots, sendRecords);
+    notifySendDone();
+
+    const results = await responsePromise;
     const cycle = buildCycleResult(results, startedAt);
 
     console.log(`[CYCLE] Results: ${cycle.ok.length} OK, ${cycle.slow.length} SLOW, ${cycle.down.length} DOWN`);

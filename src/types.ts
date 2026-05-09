@@ -25,6 +25,12 @@ export interface CycleResult {
   avgLatencyMs: number | null;
 }
 
+export interface SendRecord {
+  bot: Bot;
+  sentAt: number;
+  phone: string;
+}
+
 export interface Config {
   threshold_ok_seconds: number;
   threshold_slow_seconds: number;
