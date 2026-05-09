@@ -31,4 +31,5 @@ export interface Config {
   slow_alert_min_percentage: number;
   critical_down_percentage: number;
   dashboard_url: string;
+  cron_minutes: number;
 }

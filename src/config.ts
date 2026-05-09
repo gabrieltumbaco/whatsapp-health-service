@@ -7,6 +7,7 @@ const DEFAULTS: Config = {
   slow_alert_min_percentage: 25,
   critical_down_percentage: 50,
   dashboard_url: 'https://tooling.jelou.dev/whatsapp-health',
+  cron_minutes: 120,
 };
 
 export async function loadConfig(): Promise<Config> {
@@ -25,6 +26,7 @@ export async function loadConfig(): Promise<Config> {
       slow_alert_min_percentage: Number(record.slow_alert_min_percentage) || DEFAULTS.slow_alert_min_percentage,
       critical_down_percentage: Number(record.critical_down_percentage) || DEFAULTS.critical_down_percentage,
       dashboard_url: String(record.dashboard_url || DEFAULTS.dashboard_url),
+      cron_minutes: Number(record.cron_minutes) || DEFAULTS.cron_minutes,
     };
   } catch (err) {
     console.log('[CONFIG] Failed to load from Datum, using defaults:', (err as Error).message);
