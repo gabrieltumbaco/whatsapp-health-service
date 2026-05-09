@@ -4,6 +4,13 @@ import { createConnection } from './connection.js';
 import { runCycle } from './cycle.js';
 import { loadConfig } from './config.js';
 
+const originalLog = console.log;
+console.log = (...args: unknown[]) => {
+  const first = args[0];
+  if (typeof first === 'string' && first.startsWith('Closing session')) return;
+  originalLog(...args);
+};
+
 function minutesToCronExpression(minutes: number): string {
   if (minutes < 60) return `*/${minutes} * * * *`;
   const hours = Math.floor(minutes / 60);
