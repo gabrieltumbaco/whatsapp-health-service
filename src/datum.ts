@@ -1,5 +1,6 @@
 const BASE_URL = process.env.DATUM_BASE_URL!;
 const API_KEY = process.env.DATUM_API_KEY!;
+const TIMEOUT_MS = 15_000;
 
 export const COLLECTIONS = {
   BOTS: 'pbc_1454544717',
@@ -13,16 +14,27 @@ const headers = {
   'x-api-key': API_KEY,
 };
 
+function withTimeout(ms: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(id) };
+}
+
 export async function datumGet<T = any>(
   collectionId: string,
   params?: Record<string, string>
 ): Promise<T> {
   const query = params ? '?' + new URLSearchParams(params).toString() : '';
   const url = `${BASE_URL}/api/collections/${collectionId}/records${query}`;
+  const { signal, clear } = withTimeout(TIMEOUT_MS);
 
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`Datum GET ${res.status}: ${res.statusText}`);
-  return res.json() as T;
+  try {
+    const res = await fetch(url, { headers, signal });
+    if (!res.ok) throw new Error(`Datum GET ${res.status}: ${res.statusText}`);
+    return res.json() as T;
+  } finally {
+    clear();
+  }
 }
 
 export async function datumCreate<T = any>(
@@ -30,26 +42,38 @@ export async function datumCreate<T = any>(
   data: Record<string, unknown>
 ): Promise<T> {
   const url = `${BASE_URL}/api/collections/${collectionId}/records`;
+  const { signal, clear } = withTimeout(TIMEOUT_MS);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`Datum POST ${res.status}: ${res.statusText}`);
-  return res.json() as T;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+      signal,
+    });
+    if (!res.ok) throw new Error(`Datum POST ${res.status}: ${res.statusText}`);
+    return res.json() as T;
+  } finally {
+    clear();
+  }
 }
 
 export async function datumBatch(
   requests: Array<{ method: string; url: string; body?: Record<string, unknown> }>
 ): Promise<unknown> {
   const url = `${BASE_URL}/api/batch`;
+  const { signal, clear } = withTimeout(TIMEOUT_MS);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ requests }),
-  });
-  if (!res.ok) throw new Error(`Datum BATCH ${res.status}: ${res.statusText}`);
-  return res.json();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ requests }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`Datum BATCH ${res.status}: ${res.statusText}`);
+    return res.json();
+  } finally {
+    clear();
+  }
 }

@@ -5,7 +5,7 @@ export interface Bot {
   provider: string | null;
 }
 
-export type BotStatus = 'OK' | 'SLOW' | 'DOWN';
+export type BotStatus = 'OK' | 'SLOW' | 'DOWN' | 'SEND_FAIL';
 
 export interface BotResult {
   bot: Bot;
@@ -22,6 +22,7 @@ export interface CycleResult {
   ok: BotResult[];
   slow: BotResult[];
   down: BotResult[];
+  sendFail: BotResult[];
   avgLatencyMs: number | null;
 }
 

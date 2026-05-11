@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import cron from 'node-cron';
-import { createConnection, getSocket } from './connection.js';
+import { createConnection } from './connection.js';
 import { runCycle } from './cycle.js';
 import { loadConfig } from './config.js';
 
@@ -23,8 +23,23 @@ function minutesToCronExpression(minutes: number): string {
   return `0 */${hours} * * *`;
 }
 
+function validateEnv(): void {
+  const required = ['DATUM_BASE_URL', 'DATUM_API_KEY'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+
+  const optional = ['SLACK_BOT_TOKEN', 'SLACK_CHANNEL_ID'];
+  const missingOptional = optional.filter((key) => !process.env[key]);
+  if (missingOptional.length > 0) {
+    console.log(`[MAIN] Warning: optional env vars not set: ${missingOptional.join(', ')}`);
+  }
+}
+
 async function main() {
   console.log('[MAIN] WhatsApp Health Service v2 starting...');
+  validateEnv();
 
   const config = await loadConfig();
   const cronExpr = minutesToCronExpression(config.cron_minutes);
@@ -33,13 +48,13 @@ async function main() {
 
   cron.schedule(cronExpr, () => {
     console.log('[CRON] Triggering health check cycle');
-    runCycle(getSocket());
+    runCycle();
   });
 
   console.log(`[MAIN] Scheduled: every ${config.cron_minutes} minutes (${cronExpr})`);
   console.log('[MAIN] Running first cycle now...');
 
-  await runCycle(getSocket());
+  await runCycle();
 }
 
 main().catch((err) => {

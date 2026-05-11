@@ -23,8 +23,9 @@ export async function sendToAll(
   sock: WASocket,
   bots: Bot[],
   sendRecords: Map<string, SendRecord>
-): Promise<void> {
+): Promise<Bot[]> {
   const shuffled = shuffle(bots);
+  const failedBots: Bot[] = [];
 
   console.log(`[SEND] Sending to ${shuffled.length} bots`);
 
@@ -41,8 +42,10 @@ export async function sendToAll(
       console.log(`[SEND] ${bot.botName} (+${(delay / 1000).toFixed(1)}s)`);
     } catch (err) {
       console.log(`[SEND] ERROR ${bot.botName}: ${(err as Error).message}`);
+      failedBots.push(bot);
     }
   }
 
-  console.log(`[SEND] Done. ${sendRecords.size} records for ${bots.length} bots`);
+  console.log(`[SEND] Done. ${sendRecords.size} sent, ${failedBots.length} failed`);
+  return failedBots;
 }

@@ -1,5 +1,5 @@
 import type { WASocket } from '@whiskeysockets/baileys';
-import type { Bot, BotResult, Config, SendRecord } from './types.js';
+import type { BotResult, Config, SendRecord } from './types.js';
 
 function classifyLatency(
   latencyMs: number,
@@ -43,7 +43,6 @@ async function resolveRecord(
 
 export function waitForResponses(
   sock: WASocket,
-  bots: Bot[],
   sendRecords: Map<string, SendRecord>,
   config: Config,
   sendingDone: Promise<void>
@@ -51,25 +50,24 @@ export function waitForResponses(
   const timeoutMs = config.threshold_slow_seconds * 2 * 1000;
   const responded = new Set<string>();
   const results: BotResult[] = [];
-  const totalBots = bots.length;
 
   return new Promise((resolve) => {
     let timer: NodeJS.Timeout;
+    let expectedRecords: SendRecord[] = [];
 
     const finish = () => {
       sock.ev.off('messages.upsert', handler);
 
-      for (const bot of bots) {
-        if (responded.has(bot.phoneNumber)) continue;
-        const record = [...sendRecords.values()].find((r) => r.phone === bot.phoneNumber);
+      for (const record of expectedRecords) {
+        if (responded.has(record.phone)) continue;
         results.push({
-          bot,
+          bot: record.bot,
           status: 'DOWN',
           latencyMs: null,
-          sentAt: record?.sentAt ?? null,
+          sentAt: record.sentAt,
           respondedAt: null,
         });
-        console.log(`[RECV] ${bot.botName}: TIMEOUT [DOWN]`);
+        console.log(`[RECV] ${record.bot.botName}: TIMEOUT [DOWN]`);
       }
 
       resolve(results);
@@ -95,7 +93,7 @@ export function waitForResponses(
         results.push({ bot: record.bot, status, latencyMs, sentAt: record.sentAt, respondedAt });
         console.log(`[RECV] ${record.bot.botName}: ${(latencyMs / 1000).toFixed(1)}s [${status}]`);
 
-        if (responded.size === totalBots) {
+        if (expectedRecords.length > 0 && responded.size === expectedRecords.length) {
           clearTimeout(timer);
           sock.ev.off('messages.upsert', handler);
           resolve(results);
@@ -106,9 +104,19 @@ export function waitForResponses(
     sock.ev.on('messages.upsert', handler);
 
     sendingDone.then(() => {
-      console.log(`[RECV] Sending done. ${responded.size}/${totalBots} already responded. Timeout in ${timeoutMs / 1000}s`);
+      expectedRecords = [...sendRecords.values()];
+      const totalSent = expectedRecords.length;
 
-      if (responded.size === totalBots) {
+      console.log(`[RECV] Sending done. ${responded.size}/${totalSent} already responded. Timeout in ${timeoutMs / 1000}s`);
+
+      if (totalSent === 0) {
+        sock.ev.off('messages.upsert', handler);
+        resolve(results);
+        return;
+      }
+
+      if (responded.size === totalSent) {
+        sock.ev.off('messages.upsert', handler);
         resolve(results);
         return;
       }

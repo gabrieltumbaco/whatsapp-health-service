@@ -1,5 +1,5 @@
-import type { WASocket } from '@whiskeysockets/baileys';
 import { loadConfig } from './config.js';
+import { getSocket, isConnected, waitUntilConnected } from './connection.js';
 import { fetchBots } from './bots.js';
 import { sendToAll } from './sender.js';
 import { waitForResponses } from './receiver.js';
@@ -11,6 +11,7 @@ function buildCycleResult(results: BotResult[], startedAt: string): CycleResult 
   const ok = results.filter((r) => r.status === 'OK');
   const slow = results.filter((r) => r.status === 'SLOW');
   const down = results.filter((r) => r.status === 'DOWN');
+  const sendFail = results.filter((r) => r.status === 'SEND_FAIL');
 
   const responded = results.filter((r) => r.latencyMs !== null);
   const avgLatencyMs =
@@ -25,16 +26,27 @@ function buildCycleResult(results: BotResult[], startedAt: string): CycleResult 
     ok,
     slow,
     down,
+    sendFail,
     avgLatencyMs,
   };
 }
 
 let cycleRunning = false;
 
-export async function runCycle(sock: WASocket): Promise<void> {
+export async function runCycle(): Promise<void> {
   if (cycleRunning) {
     console.log('[CYCLE] Already running, skipping');
     return;
+  }
+
+  if (!isConnected()) {
+    console.log('[CYCLE] Socket not connected, waiting up to 30s...');
+    const ok = await waitUntilConnected(30_000);
+    if (!ok) {
+      console.log('[CYCLE] Socket still not connected after 30s, skipping cycle');
+      return;
+    }
+    console.log('[CYCLE] Socket reconnected, proceeding');
   }
 
   cycleRunning = true;
@@ -43,6 +55,7 @@ export async function runCycle(sock: WASocket): Promise<void> {
   console.log('[CYCLE] ========== START ==========');
 
   try {
+    const sock = getSocket();
     const config = await loadConfig();
     const bots = await fetchBots();
 
@@ -52,14 +65,24 @@ export async function runCycle(sock: WASocket): Promise<void> {
     let notifySendDone!: () => void;
     const sendingDone = new Promise<void>((r) => { notifySendDone = r; });
 
-    const responsePromise = waitForResponses(sock, bots, sendRecords, config, sendingDone);
-    await sendToAll(sock, bots, sendRecords);
+    const responsePromise = waitForResponses(sock, sendRecords, config, sendingDone);
+    const failedBots = await sendToAll(sock, bots, sendRecords);
     notifySendDone();
 
-    const results = await responsePromise;
-    const cycle = buildCycleResult(results, startedAt);
+    const responseResults = await responsePromise;
+    const failedResults: BotResult[] = failedBots.map((bot) => ({
+      bot,
+      status: 'SEND_FAIL' as const,
+      latencyMs: null,
+      sentAt: null,
+      respondedAt: null,
+    }));
 
-    console.log(`[CYCLE] Results: ${cycle.ok.length} OK, ${cycle.slow.length} SLOW, ${cycle.down.length} DOWN`);
+    const cycle = buildCycleResult([...responseResults, ...failedResults], startedAt);
+
+    const parts = [`${cycle.ok.length} OK`, `${cycle.slow.length} SLOW`, `${cycle.down.length} DOWN`];
+    if (cycle.sendFail.length > 0) parts.push(`${cycle.sendFail.length} SEND_FAIL`);
+    console.log(`[CYCLE] Results: ${parts.join(', ')}`);
 
     await notifySlack(cycle, config);
     await saveMetrics(cycle);

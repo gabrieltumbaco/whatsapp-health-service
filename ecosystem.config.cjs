@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'whatsapp-health',
       script: 'dist/index.js',
+      cwd: __dirname,
       node_args: '--max-old-space-size=256',
       exec_mode: 'fork',
       instances: 1,

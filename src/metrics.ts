@@ -12,6 +12,7 @@ export async function saveMetrics(cycle: CycleResult): Promise<void> {
         bots_ok: cycle.ok.length,
         bots_slow: cycle.slow.length,
         bots_down: cycle.down.length,
+        bots_send_fail: cycle.sendFail.length,
         avg_latency_ms: cycle.avgLatencyMs,
       }
     );

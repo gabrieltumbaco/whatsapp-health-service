@@ -76,27 +76,34 @@ function formatBotList(bots: BotResult[], emoji: string): string {
     .join('\n');
 }
 
+function sentTotal(cycle: CycleResult): number {
+  return cycle.results.length - cycle.sendFail.length;
+}
+
 function buildBlocks(cycle: CycleResult, config: Config) {
-  const total = cycle.results.length;
-  const isCritical =
+  const total = sentTotal(cycle);
+  const isCritical = total > 0 &&
     (cycle.down.length / total) * 100 >= config.critical_down_percentage;
 
   const blocks: any[] = [];
 
   const header = isCritical
-    ? ':rotating_light: <!channel> *ALERTA CRÍTICA — WhatsApp Health Check*'
+    ? ':rotating_light: <!channel> *ALERTA CRITICA — WhatsApp Health Check*'
     : ':warning: *WhatsApp Health Check — Issues Detected*';
 
   blocks.push(section(header));
 
-  const summary = [
+  const summaryParts = [
     `:red_circle: ${cycle.down.length} Down`,
     `:large_yellow_circle: ${cycle.slow.length} Slow`,
     `:large_green_circle: ${cycle.ok.length}/${total}`,
     `Avg \`${cycle.avgLatencyMs ? (cycle.avgLatencyMs / 1000).toFixed(1) + 's' : 'N/A'}\``,
-  ].join(' · ');
+  ];
+  if (cycle.sendFail.length > 0) {
+    summaryParts.push(`:no_entry: ${cycle.sendFail.length} Send fail`);
+  }
 
-  blocks.push(section(summary));
+  blocks.push(section(summaryParts.join(' · ')));
   blocks.push(divider());
 
   if (cycle.down.length > 0) {
@@ -105,6 +112,11 @@ function buildBlocks(cycle: CycleResult, config: Config) {
 
   if (cycle.slow.length > 0) {
     blocks.push(section(`*:large_yellow_circle: Services SLOW (${cycle.slow.length}):*\n${formatBotList(cycle.slow, ':large_yellow_circle:')}`));
+  }
+
+  if (cycle.sendFail.length > 0) {
+    const failList = cycle.sendFail.map((b) => `:no_entry: ${b.bot.botName} (${b.bot.provider ?? 'unknown'})`).join('\n');
+    blocks.push(section(`*:no_entry: Send failed (${cycle.sendFail.length}):*\n${failList}`));
   }
 
   if (isCritical && config.dashboard_url) {
@@ -188,19 +200,22 @@ function buildThreadBlocks(cycle: CycleResult) {
 export async function notifySlack(cycle: CycleResult, config: Config): Promise<void> {
   if (!SLACK_TOKEN || !SLACK_CHANNEL) return;
 
-  const slowPct = (cycle.slow.length / cycle.results.length) * 100;
+  const total = sentTotal(cycle);
+  const hasSendFail = cycle.sendFail.length > 0;
   const hasDown = cycle.down.length > 0;
+  const slowPct = total > 0 ? (cycle.slow.length / total) * 100 : 0;
   const slowAboveThreshold = slowPct >= config.slow_alert_min_percentage;
 
-  if (!hasDown && !slowAboveThreshold) {
+  if (!hasDown && !slowAboveThreshold && !hasSendFail) {
     console.log('[SLACK] All OK — no notification needed');
     return;
   }
 
-  const isCritical = (cycle.down.length / cycle.results.length) * 100 >= config.critical_down_percentage;
+  const isCritical = total > 0 &&
+    (cycle.down.length / total) * 100 >= config.critical_down_percentage;
   const text = isCritical
-    ? `CRITICAL: ${cycle.down.length}/${cycle.results.length} services DOWN`
-    : `Health Check: ${cycle.down.length} DOWN, ${cycle.slow.length} SLOW`;
+    ? `CRITICAL: ${cycle.down.length}/${total} services DOWN`
+    : `Health Check: ${cycle.down.length} DOWN, ${cycle.slow.length} SLOW${hasSendFail ? `, ${cycle.sendFail.length} SEND_FAIL` : ''}`;
 
   const blocks = buildBlocks(cycle, config);
   const result = await slackPost({ text, blocks, unfurl_links: false, unfurl_media: false });
