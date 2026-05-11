@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import cron from 'node-cron';
-import { createConnection } from './connection.js';
+import { createConnection, getSocket } from './connection.js';
 import { runCycle } from './cycle.js';
 import { loadConfig } from './config.js';
 
@@ -29,17 +29,17 @@ async function main() {
   const config = await loadConfig();
   const cronExpr = minutesToCronExpression(config.cron_minutes);
 
-  const sock = await createConnection();
+  await createConnection();
 
   cron.schedule(cronExpr, () => {
     console.log('[CRON] Triggering health check cycle');
-    runCycle(sock);
+    runCycle(getSocket());
   });
 
   console.log(`[MAIN] Scheduled: every ${config.cron_minutes} minutes (${cronExpr})`);
   console.log('[MAIN] Running first cycle now...');
 
-  await runCycle(sock);
+  await runCycle(getSocket());
 }
 
 main().catch((err) => {
