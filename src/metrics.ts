@@ -28,7 +28,7 @@ export async function saveMetrics(cycle: CycleResult): Promise<void> {
         sent_at: r.sentAt ? new Date(r.sentAt).toISOString() : null,
         responded_at: r.respondedAt ? new Date(r.respondedAt).toISOString() : null,
         latency_ms: r.latencyMs,
-        status: r.status === 'SLOW' ? 'SLOWDOWN' : r.status,
+        status: r.status,
       },
     }));
 

@@ -15,7 +15,7 @@ function buildCycleResult(results: BotResult[], startedAt: string): CycleResult 
   const responded = results.filter((r) => r.latencyMs !== null);
   const avgLatencyMs =
     responded.length > 0
-      ? responded.reduce((sum, r) => sum + r.latencyMs!, 0) / responded.length
+      ? Math.round(responded.reduce((sum, r) => sum + r.latencyMs!, 0) / responded.length)
       : null;
 
   return {
