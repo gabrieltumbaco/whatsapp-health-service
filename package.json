@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsup src/index.ts --format esm",
     "start": "node dist/index.js"
   },
   "repository": {
@@ -15,7 +15,7 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc10",
