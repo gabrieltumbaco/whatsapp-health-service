@@ -4,12 +4,18 @@ import { createConnection } from './connection.js';
 import { runCycle } from './cycle.js';
 import { loadConfig } from './config.js';
 
-const originalLog = console.log;
-console.log = (...args: unknown[]) => {
-  const first = args[0];
-  if (typeof first === 'string' && first.startsWith('Closing session')) return;
-  originalLog(...args);
-};
+const NOISE = ['Closing session', 'Session error', 'Bad MAC', 'Failed to decrypt', 'Decrypted message', 'Session already'];
+function filterNoise(original: (...args: unknown[]) => void) {
+  return (...args: unknown[]) => {
+    const str = args.map(String).join(' ');
+    if (NOISE.some((n) => str.includes(n))) return;
+    original(...args);
+  };
+}
+console.log = filterNoise(console.log.bind(console));
+console.error = filterNoise(console.error.bind(console));
+console.warn = filterNoise(console.warn.bind(console));
+console.info = filterNoise(console.info.bind(console));
 
 function minutesToCronExpression(minutes: number): string {
   if (minutes < 60) return `*/${minutes} * * * *`;

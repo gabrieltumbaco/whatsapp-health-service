@@ -4,10 +4,11 @@ import type { Bot, BotResult, Config, SendRecord } from './types.js';
 function classifyLatency(
   latencyMs: number,
   config: Config
-): 'OK' | 'SLOW' {
+): 'OK' | 'SLOW' | 'DOWN' {
   const latencySec = latencyMs / 1000;
   if (latencySec <= config.threshold_ok_seconds) return 'OK';
-  return 'SLOW';
+  if (latencySec <= config.threshold_slow_seconds) return 'SLOW';
+  return 'DOWN';
 }
 
 async function resolveRecord(

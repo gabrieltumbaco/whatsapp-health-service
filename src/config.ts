@@ -4,7 +4,7 @@ import type { Config } from './types.js';
 const DEFAULTS: Config = {
   threshold_ok_seconds: 5,
   threshold_slow_seconds: 10,
-  slow_alert_min_percentage: 25,
+  slow_alert_min_percentage: 10,
   critical_down_percentage: 50,
   dashboard_url: 'https://tooling.jelou.dev/whatsapp-health',
   cron_minutes: 120,

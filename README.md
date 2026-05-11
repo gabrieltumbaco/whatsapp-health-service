@@ -107,15 +107,15 @@ src/
 | Estado | Condicion | Accion |
 |--------|-----------|--------|
 | **OK** | Latencia ≤ `threshold_ok_seconds` (5s) | Sin alerta |
-| **SLOW** | Latencia ≤ `threshold_slow_seconds` (10s) | Alerta si % ≥ `slow_alert_min_percentage` |
-| **DOWN** | Sin respuesta (timeout = `threshold_slow * 2`) | Siempre alerta |
+| **SLOW** | Latencia entre 5s y `threshold_slow_seconds` (10s) | Alerta si % ≥ `slow_alert_min_percentage` |
+| **DOWN** | Latencia > `threshold_slow_seconds` (10s) o sin respuesta (timeout) | Siempre alerta |
 
 ## Notificaciones Slack
 
 ### Cuando se notifica
 
 - `DOWN > 0` → siempre
-- `SLOW %` ≥ `slow_alert_min_percentage` (25%) → alerta
+- `SLOW %` ≥ `slow_alert_min_percentage` (10%) → alerta
 - Todos OK → sin notificacion (log solamente)
 - `DOWN %` ≥ `critical_down_percentage` (50%) → alerta critica con `@channel`
 
