@@ -4,6 +4,7 @@ const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL_ID;
 const SLACK_API = 'https://slack.com/api/chat.postMessage';
 const TIMEOUT_MS = 10_000;
+const DEFAULT_PROVIDER = 'Gupshup';
 
 interface SlackResponse {
   ok: boolean;
@@ -53,10 +54,6 @@ function divider() {
   return { type: 'divider' };
 }
 
-function context(text: string) {
-  return { type: 'context', elements: [{ type: 'mrkdwn', text }] };
-}
-
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString('es-EC', {
     timeZone: 'America/Guayaquil',
@@ -67,13 +64,33 @@ function formatTime(ms: number): string {
   });
 }
 
-function formatBotList(bots: BotResult[], emoji: string): string {
-  return bots
+function formatBotList(bots: BotResult[]): string {
+  return [...bots]
+    .sort((a, b) => (b.latencyMs ?? Infinity) - (a.latencyMs ?? Infinity))
     .map((b) => {
       const latency = b.latencyMs ? `${(b.latencyMs / 1000).toFixed(1)}s` : 'timeout';
-      return `${emoji} ${b.bot.botName} — ${latency} (${b.bot.provider ?? 'unknown'})`;
+      const name = `<https://wa.me/${b.bot.phoneNumber}|${b.bot.botName}>`;
+      const provider = b.bot.provider && b.bot.provider !== DEFAULT_PROVIDER
+        ? ` [${b.bot.provider}]`
+        : '';
+      return `• ${name}${provider} — \`${latency}\``;
     })
     .join('\n');
+}
+
+function splitIntoSections(text: string) {
+  const lines = text.split('\n');
+  const blocks: any[] = [];
+  let chunk = '';
+  for (const line of lines) {
+    if (chunk.length + line.length + 1 > 3000) {
+      blocks.push(section(chunk));
+      chunk = '';
+    }
+    chunk += (chunk ? '\n' : '') + line;
+  }
+  if (chunk) blocks.push(section(chunk));
+  return blocks;
 }
 
 function sentTotal(cycle: CycleResult): number {
@@ -87,17 +104,15 @@ function buildBlocks(cycle: CycleResult, config: Config) {
 
   const blocks: any[] = [];
 
-  const header = isCritical
-    ? ':rotating_light: <!channel> *ALERTA CRITICA — WhatsApp Health Check*'
-    : ':warning: *WhatsApp Health Check — Issues Detected*';
-
-  blocks.push(section(header));
+  if (isCritical) {
+    blocks.push(section(':rotating_light: <!channel> *ALERTA CRITICA — WhatsApp Health Check*'));
+  }
 
   const summaryParts = [
     `:red_circle: ${cycle.down.length} Down`,
     `:large_yellow_circle: ${cycle.slow.length} Slow`,
     `:large_green_circle: ${cycle.ok.length}/${total}`,
-    `Avg \`${cycle.avgLatencyMs ? (cycle.avgLatencyMs / 1000).toFixed(1) + 's' : 'N/A'}\``,
+    `Avg \`${cycle.avgLatencyMs ? (cycle.avgLatencyMs / 1000).toFixed(2) + 's' : 'N/A'}\``,
   ];
   if (cycle.sendFail.length > 0) {
     summaryParts.push(`:no_entry: ${cycle.sendFail.length} Send fail`);
@@ -107,11 +122,23 @@ function buildBlocks(cycle: CycleResult, config: Config) {
   blocks.push(divider());
 
   if (cycle.down.length > 0) {
-    blocks.push(section(`*:red_circle: Services DOWN (${cycle.down.length}):*\n${formatBotList(cycle.down, ':red_circle:')}`));
+    blocks.push(section('*:red_circle: Down Services*'));
+    const downList = formatBotList(cycle.down);
+    if (downList.length <= 3000) {
+      blocks.push(section(downList));
+    } else {
+      blocks.push(...splitIntoSections(downList));
+    }
   }
 
   if (cycle.slow.length > 0) {
-    blocks.push(section(`*:large_yellow_circle: Services SLOW (${cycle.slow.length}):*\n${formatBotList(cycle.slow, ':large_yellow_circle:')}`));
+    blocks.push(section('*:large_yellow_circle: Slow Services*'));
+    const slowList = formatBotList(cycle.slow);
+    if (slowList.length <= 3000) {
+      blocks.push(section(slowList));
+    } else {
+      blocks.push(...splitIntoSections(slowList));
+    }
   }
 
   if (cycle.sendFail.length > 0) {
@@ -127,14 +154,12 @@ function buildBlocks(cycle: CycleResult, config: Config) {
       accessory: {
         type: 'button',
         text: { type: 'plain_text', text: 'Abrir Dashboard' },
+        style: 'primary',
         url: config.dashboard_url,
         action_id: 'dashboard-action',
       },
     });
   }
-
-  const now = new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' });
-  blocks.push(context(`Cycle: ${now}`));
 
   return blocks;
 }
@@ -147,12 +172,13 @@ function buildThreadBlocks(cycle: CycleResult) {
 
   const issues = [...cycle.down, ...cycle.slow];
   const lines = issues.map((r) => {
+    const name = `<https://wa.me/${r.bot.phoneNumber}|${r.bot.botName}>`;
     const sent = r.sentAt ? `\`${formatTime(r.sentAt)}\`` : ':x: no enviado';
     if (r.latencyMs === null) {
-      return `*${r.bot.botName}*\n${sent} → timeout`;
+      return `*${name}*\n${sent} → timeout`;
     }
     const responded = r.respondedAt ? `\`${formatTime(r.respondedAt)}\`` : '-';
-    return `*${r.bot.botName}*\n${sent} → ${responded} = \`${(r.latencyMs / 1000).toFixed(1)}s\``;
+    return `*${name}*\n${sent} → ${responded} = \`${(r.latencyMs / 1000).toFixed(1)}s\``;
   });
 
   let chunk = '';
