@@ -12,6 +12,7 @@ export interface BotResult {
   status: BotStatus;
   latencyMs: number | null;
   sentAt: number | null;
+  deliveredAt: number | null;
   respondedAt: number | null;
 }
 
@@ -30,6 +31,8 @@ export interface SendRecord {
   bot: Bot;
   sentAt: number;
   phone: string;
+  messageId: string | null;
+  deliveredAt: number | null;
 }
 
 export interface Config {

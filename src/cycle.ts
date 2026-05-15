@@ -75,6 +75,7 @@ export async function runCycle(): Promise<void> {
       status: 'SEND_FAIL' as const,
       latencyMs: null,
       sentAt: null,
+      deliveredAt: null,
       respondedAt: null,
     }));
 

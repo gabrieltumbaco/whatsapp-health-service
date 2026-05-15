@@ -1,4 +1,4 @@
-import type { WASocket } from '@whiskeysockets/baileys';
+import type { WASocket, WAMessageUpdate } from '@whiskeysockets/baileys';
 import type { BotResult, Config, SendRecord } from './types.js';
 
 function classifyLatency(
@@ -55,8 +55,25 @@ export function waitForResponses(
     let timer: NodeJS.Timeout;
     let expectedRecords: SendRecord[] = [];
 
+    const ackHandler = (updates: WAMessageUpdate[]) => {
+      for (const { key, update } of updates) {
+        if (update.status !== 3) continue;
+        if (!key.id) continue;
+        for (const record of sendRecords.values()) {
+          if (record.messageId === key.id && !record.deliveredAt) {
+            record.deliveredAt = Date.now();
+            console.log(`[RECV] ACK delivered: ${record.bot.botName}`);
+            break;
+          }
+        }
+      }
+    };
+
+    sock.ev.on('messages.update', ackHandler);
+
     const finish = () => {
       sock.ev.off('messages.upsert', handler);
+      sock.ev.off('messages.update', ackHandler);
 
       for (const record of expectedRecords) {
         if (responded.has(record.phone)) continue;
@@ -65,6 +82,7 @@ export function waitForResponses(
           status: 'DOWN',
           latencyMs: null,
           sentAt: record.sentAt,
+          deliveredAt: record.deliveredAt,
           respondedAt: null,
         });
         console.log(`[RECV] ${record.bot.botName}: TIMEOUT [DOWN]`);
@@ -87,15 +105,16 @@ export function waitForResponses(
 
         responded.add(record.phone);
         const respondedAt = Date.now();
-        const latencyMs = respondedAt - record.sentAt;
+        const latencyMs = respondedAt - (record.deliveredAt ?? record.sentAt);
         const status = classifyLatency(latencyMs, config);
 
-        results.push({ bot: record.bot, status, latencyMs, sentAt: record.sentAt, respondedAt });
+        results.push({ bot: record.bot, status, latencyMs, sentAt: record.sentAt, deliveredAt: record.deliveredAt, respondedAt });
         console.log(`[RECV] ${record.bot.botName}: ${(latencyMs / 1000).toFixed(1)}s [${status}]`);
 
         if (expectedRecords.length > 0 && responded.size === expectedRecords.length) {
           clearTimeout(timer);
           sock.ev.off('messages.upsert', handler);
+          sock.ev.off('messages.update', ackHandler);
           resolve(results);
         }
       }
@@ -111,12 +130,14 @@ export function waitForResponses(
 
       if (totalSent === 0) {
         sock.ev.off('messages.upsert', handler);
+        sock.ev.off('messages.update', ackHandler);
         resolve(results);
         return;
       }
 
       if (responded.size === totalSent) {
         sock.ev.off('messages.upsert', handler);
+        sock.ev.off('messages.update', ackHandler);
         resolve(results);
         return;
       }

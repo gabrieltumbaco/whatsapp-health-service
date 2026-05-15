@@ -27,6 +27,7 @@ export async function saveMetrics(cycle: CycleResult): Promise<void> {
         bot_id: r.bot.id,
         cycle_id: cycleId,
         sent_at: r.sentAt ? new Date(r.sentAt).toISOString() : null,
+        delivered_at: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
         responded_at: r.respondedAt ? new Date(r.respondedAt).toISOString() : null,
         latency_ms: r.latencyMs,
         status: r.status,

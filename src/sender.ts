@@ -37,8 +37,8 @@ export async function sendToAll(
     const msg = getRandomMessage();
 
     try {
-      await sock.sendMessage(jid, { text: msg });
-      sendRecords.set(jid, { bot, sentAt: Date.now(), phone: bot.phoneNumber });
+      const sent = await sock.sendMessage(jid, { text: msg });
+      sendRecords.set(jid, { bot, sentAt: Date.now(), phone: bot.phoneNumber, messageId: sent?.key?.id ?? null, deliveredAt: null });
       console.log(`[SEND] ${bot.botName} (+${(delay / 1000).toFixed(1)}s)`);
     } catch (err) {
       console.log(`[SEND] ERROR ${bot.botName}: ${(err as Error).message}`);

@@ -167,7 +167,7 @@ function buildBlocks(cycle: CycleResult, config: Config) {
 function buildThreadBlocks(cycle: CycleResult) {
   const blocks: any[] = [];
 
-  blocks.push(section(':mag: *Detalles y timestamps del ciclo de monitoreo*\n`enviado` → `respondió` = `latencia`'));
+  blocks.push(section(':mag: *Detalles y timestamps del ciclo de monitoreo*\n`enviado` → `entregado` → `respondió` = `latencia`'));
   blocks.push(divider());
 
   const issues = [...cycle.down, ...cycle.slow];
@@ -178,6 +178,10 @@ function buildThreadBlocks(cycle: CycleResult) {
       return `*${name}*\n${sent} → timeout`;
     }
     const responded = r.respondedAt ? `\`${formatTime(r.respondedAt)}\`` : '-';
+    if (r.deliveredAt) {
+      const delivered = `\`${formatTime(r.deliveredAt)}\``;
+      return `*${name}*\n${sent} → ${delivered} → ${responded} = \`${(r.latencyMs / 1000).toFixed(1)}s\``;
+    }
     return `*${name}*\n${sent} → ${responded} = \`${(r.latencyMs / 1000).toFixed(1)}s\``;
   });
 
